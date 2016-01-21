@@ -1,10 +1,14 @@
 'use strict';
 
 var express = require('express');
-var routes = require('./app/routes/index.js');
+//var routes = require('./app/routes/index.js');
 var mongoose = require('mongoose');
 var passport = require('passport');
 var session = require('express-session');
+var valid = require('valid-url'); 
+var store = require('node-persist');
+var coreUrl = require('url');
+
 
 var app = express();
 require('dotenv').load();
@@ -25,7 +29,45 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-routes(app, passport);
+store.initSync({
+	dir: 'store'
+});
+app.route("/")
+	.get(function(req, res){
+		res.sendFile(process.cwd() + '/public/index.html');	
+	});
+app.route("/new/*")
+	.get(function(req, res){
+		var url = req.protocol + '://' + req.params[0]; 
+		console.log(url); 
+		
+		
+		if (!valid.isUri(url)) {
+			res.send({error: 'Invalid url'});
+		} else {
+			var i = store.length() + 1;
+			store.setItemSync(String(i), url);
+			var domain = req.get('host'); 
+			
+			res.json({
+				og: url,
+				short: coreUrl.format({
+					protocol: req.protocol, 
+					host: domain}) + '/' + i
+				
+			});
+		}
+	});
+	
+app.route("/:id")
+	.get(function(req, res){
+		var id = req.params.id; 
+		var url = store.getItemSync(String(id)); 
+		
+		res.redirect(url ? url : req.get('host')); 
+		
+	});
+//routes(app, passport);
 
 var port = process.env.PORT || 8080;
 app.listen(port,  function () {
